@@ -1,0 +1,128 @@
+
+---
+- name: Provision Web and Application Node
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+
+    - name: Install baseline web and CLI packages
+      ansible.builtin.package:
+        name: "{{ baseline_packages }}"
+        state: present
+
+    - name: Create deployment group
+      ansible.builtin.group:
+        name: "{{ deploy_group }}"
+        state: present
+
+    - name: Create deployment user
+      ansible.builtin.user:
+        name: "{{ deploy_user }}"
+        groups: "{{ deploy_group }}"
+        append: true
+        shell: /bin/bash
+        create_home: true
+        state: present
+
+    - name: Ensure web root directory exists
+      ansible.builtin.file:
+        path: "{{ web_root }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0755"
+
+    - name: Deploy professional node status page
+      ansible.builtin.copy:
+        dest: "{{ web_root }}/index.html"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0644"
+        content: |
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Managed Node Dashboard</title>
+              <style>
+                  body {
+                      font-family: Arial, sans-serif;
+                      background: #f0f4f8;
+                      text-align: center;
+                      padding: 50px;
+                  }
+                  .container {
+                      background: white;
+                      max-width: 650px;
+                      margin: auto;
+                      padding: 35px;
+                      border-radius: 12px;
+                      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                  }
+                  h1 {
+                      color: #1565c0;
+                  }
+                  .status {
+                      color: #16803c;
+                      font-weight: bold;
+                  }
+                  .details {
+                      background: #eef4fb;
+                      padding: 15px;
+                      border-radius: 8px;
+                      margin-top: 20px;
+                      line-height: 2;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>Welcome to Managed Node</h1>
+                  <p class="status">Server Status: Active</p>
+                  <div class="details">
+                      <p><strong>Hostname:</strong> {{ ansible_facts['hostname'] }}</p>
+                      <p><strong>Environment:</strong> {{ app_environment }}</p>
+                      <p><strong>Operating System:</strong> {{ ansible_facts['distribution'] }}</p>
+                      <p><strong>OS Version:</strong> {{ ansible_facts['distribution_version'] }}</p>
+                      <p><strong>Management:</strong> Ansible Automation</p>
+                  </div>
+                  <p>Infrastructure successfully configured using Ansible.</p>
+              </div>
+          </body>
+          </html>
+
+    - name: Write MOTD warning for SSH logins
+      ansible.builtin.copy:
+        dest: /etc/motd
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          ============================================================
+          NOTICE: {{ ansible_facts['hostname'] }}
+          Environment: {{ app_environment }}
+
+          This server is managed by Ansible.
+          Manual changes may be overwritten during synchronization.
+          ============================================================
+
+    - name: Ensure web server service is running and enabled
+      ansible.builtin.service:
+        name: "{{ web_service_name }}"
+        state: started
+        enabled: true
+
+    - name: Schedule automatic Ansible synchronization
+      ansible.builtin.cron:
+        name: ansible-pull web node sync
+        user: root
+        minute: "*/15"
+        job: "ansible-pull -o -U {{ ansible_pull_repo }} >> /var/log/ansible-pull.log 2>&1"
+        cron_file: ansible-pull-web
