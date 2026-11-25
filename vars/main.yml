@@ -1,0 +1,22 @@
+
+---
+# Deployment user configuration
+deploy_user: deploy
+deploy_group: sudo  # Use 'wheel' on RHEL/Fedora-based systems
+
+# Web server configuration
+web_service_name: nginx
+web_root: /var/www/html
+
+# Application environment
+app_environment: staging
+
+# Ansible Pull GitHub repository
+ansible_pull_repo: https://github.com/YOUR_USERNAME/ansible-web-node-pull.git
+
+# Required system packages
+baseline_packages:
+  - nginx
+  - curl
+  - jq
+  - unzip
